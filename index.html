@@ -21,16 +21,19 @@
       height: 100%;
       width: 100%;
     }
+    #logo { position: absolute; width: 10%; top: 0px; left: 0px; z-index: 1; }
   </style>
 
   <body>
     <div id='map' style='width: 100%; height: 100%;'></div>
+    <img id="logo" src="Faimes.png" alt="Logo">
+
     <script>
       mapboxgl.accessToken = 'pk.eyJ1IjoidHRvb2ZmIiwiYSI6ImNscXd4bmppMDA4bnAya3B6enB5MDNhaGsifQ.5MU53sF5b8x2yVpTmBoNyw';
       const map = new mapboxgl.Map({
 	      container: 'map', // container ID
         style: 'mapbox://styles/ttooff/clrqwd2df00a801pg9fpn0772', // style URL
-        center: [5.2538, 50.6958], // starting position [lng, lat]
+        center: [5.27039, 50.63578], // starting position [lng, lat]50.63578/5.27039
         zoom: 13, // starting zoom
       });
 
@@ -41,16 +44,6 @@ const popup = new mapboxgl.Popup({ closeButton: false });
 const nav = new mapboxgl.NavigationControl();
 map.addControl(nav, 'top-right');
 
-// Example mapping object for layer names to content and image URLs
-const layerContentMap = {
-  'F99c': { text: 'F99c', imageUrl: 'https://securotheque.wallonie.be/files/wp-content/uploads/Signaux/Type%20F%20Indication/F99c-complet-det.png' },
-  'PCS': { text: 'Piste Cyclable Séparée', imageUrl: 'https://securotheque.wallonie.be/files/wp-content/uploads/Signaux/Type%20D%20Obligation/D7-det.png' },
-  'SUL': { text: 'Sens Unique Limité', imageUrl: 'https://securotheque.wallonie.be/files/wp-content/uploads/Signaux/Type%20C%20Interdiction/C1-et-M2-Sul-det.png' },
-  'PCM': { text: 'Piste Cyclable Marquée', imageUrl: 'https://securotheque.wallonie.be/files/wp-content/uploads/Fiches%20th%c3%a9matiques/E%20Am%c3%a9nagements%20usagers%20et%20v%c3%a9hicules/E.3.02.07.001-Photo-1-redim.jpg' },
-  'BCS': { text: 'Bande Cyclable Suggérée', imageUrl: 'https://www.lavenir.net/resizer/GRqVk2J5WPC2aeYClnLuQza4_BU=/1200x800/filters:format(jpeg):focal(507x348:517x338)/cloudfront-eu-central-1.images.arcpublishing.com/ipmgroup/33QERI2W4NA6XOJTQYGZXQP4AU.jpg' },
-  
-  // Add more entries as needed
-};
  // Load GeoJSON data after the map is fully loaded
  map.on('load', () => {
     fetch('Faimes_Promenades.geojson') // Replace with the correct path to your GeoJSON file
@@ -75,20 +68,29 @@ const layerContentMap = {
           else if (faimesAttributes.length === 2) {
             const color1 = getColorByAttribute(faimesAttributes[0]);
             const color2 = getColorByAttribute(faimesAttributes[1]);
-            drawLine(feature, color1, -3, faimesAttributes[0]);
-            drawLine(feature, color2, +3, faimesAttributes[1]);
+            drawLine(feature, color1, -3.5, faimesAttributes[0]);
+            drawLine(feature, color2, +3.5, faimesAttributes[1]);
           }
           // If three Faimes attributes are defined, draw three independent parallel lines with an offset and corresponding colors and add to triple layer
           else if (faimesAttributes.length === 3) {
             const color1 = getColorByAttribute(faimesAttributes[0]);
             const color2 = getColorByAttribute(faimesAttributes[1]);
             const color3 = getColorByAttribute(faimesAttributes[2]);
-            drawLine(feature, color1, -6, faimesAttributes[0]);
-            drawLine(feature, color2,  0, faimesAttributes[1]);
-            drawLine(feature, color3,  6, faimesAttributes[2]);
+            drawLine(feature, color1, -7, faimesAttributes[0]);
+            drawLine(feature, color2,  7, faimesAttributes[1]);
+            drawLine(feature, color3,  0, faimesAttributes[2]);
           }
           // Add more conditions for handling other cases if needed
         });
+
+       // Move all layers containing "label" to the front
+       const layers = map.getStyle().layers;
+        layers.forEach(layer => {
+          if (layer.id.includes('label')) {
+            map.moveLayer(layer.id);
+          }
+        });
+
     })
     .catch(error => console.error('Error loading GeoJSON:', error));
 });
@@ -96,7 +98,7 @@ const layerContentMap = {
 // Function to draw a single line with a specified color and add it to the specified layer
 function drawLine(feature, color, offset, faimesId) {
   map.addLayer({
-    'id': faimesId,
+    'id': faimesId+feature.properties['@id']+'-'+offset,
     'type': 'line',
     'source': 'custom-source',
     'paint': {
@@ -117,67 +119,15 @@ function getColorByAttribute(attribute) {
   // You can modify this function to return different colors based on the Faimes attribute
   // For simplicity, I'll use a switch statement here
   switch (attribute) {
-    case 'Faimes1': return 'rgb(243, 53, 53)';
-    case 'Faimes2': return 'rgb(81, 219, 134)';
-    case 'Faimes3': return 'rgb(77, 114, 224)';
-    case 'Faimes5': return 'rgb(140, 25, 169)';
-    case 'Faimes11': return 'rgb(244, 183, 52)';
+    case 'Faimes1': return 'rgb(224, 7, 3)';    // Rouge
+    case 'Faimes2': return 'rgb(58, 165, 252)'; // Bleu clair
+    case 'Faimes3': return 'rgb(140, 25, 169)'; // Mauve
+    case 'Faimes5': return 'rgb(102, 202, 88)'; // Vert
+    case 'Faimes11': return 'rgb(253, 186, 2)'; // Orange
     // Add more cases as needed
     default: return 'yellow'; // Default color if none of the cases are met
   }
 }
-
-map.on('mousemove', function(e) {
-  const features = map.queryRenderedFeatures(e.point);
-
-  // Filter features to only include those with a non-transparent line color
-  const nonTransparentLineFeatures = features.filter(feature => {
-    const lineColor = feature.layer.paint['line-color'];
-    const layerName = feature.layer.id;
-
-    // Exclude layers with specific names
-    const excludeLayers = ['Highways - case', 'Highways - line', 'road-rail-tracks', 'road-rail', 'waterway', 'waterway-shadow'];
-    const isExcluded = excludeLayers.includes(layerName);
-
-    return lineColor && lineColor != 'transparent' && lineColor != 'rgba(0,0,0,0)' && !isExcluded;
-  });
-
-  // Extract information for the first layer with a non-transparent line color
-  const firstNonTransparentLineFeature = nonTransparentLineFeatures[0];
-
-  // Close the pop-up
-  popup.remove();
-
-  if (firstNonTransparentLineFeature) {
-    const layerName = firstNonTransparentLineFeature.layer.id;
-
-    // Check if the layerName is in the mapping object
-    if (layerContentMap[layerName]) {
-      const { text, imageUrl } = layerContentMap[layerName];
-
-      // Set pop-up content with text and image
-      popup.setLngLat(e.lngLat)
-        .setHTML(`
-          <div>
-            <center>
-            <strong>${text}</strong>
-            <br>
-            <img src="${imageUrl}" alt="Image" style="max-width: 100%; max-height: 100px;">
-            </center>
-          </div>
-        `)
-        .addTo(map);
-    } else {
-      // Default content if layerName is not in the mapping object
-      popup.setLngLat(e.lngLat)
-        .setHTML(`<div><strong>${layerName}:</strong> No additional information available</div>`)
-        .addTo(map);
-    }
-  }
-});
-
-const excludeLayers = ['Highways - case', 'Highways - line', 'road-rail-tracks', 'road-rail', 'waterway', 'waterway-shadow'];
-
     </script>
   </body>
 
