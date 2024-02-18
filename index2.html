@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset="UTF-8"> 
+    <title>GRACQ Hesbaye - Custom Cycle Map Style</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" integrity="sha256-kLaT2GOSpHechhsozzB+flnD+zUyjE2LlfWPgU04xyI=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js" integrity="sha256-WBkoXOwTeyKclOHuWtc+i2uENFpDZ9YPdf5Hf+D7ewM=" crossorigin="">
+    </script>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css' rel='stylesheet' />
+  </head>
+  <style>
+    body {
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+    }
+    html,
+    body {
+      height: 100%;
+      width: 100%;
+    }
+    #logo { position: absolute; width: 10%; top: 0px; left: 0px; z-index: 1; }
+  </style>
+
+  <body>
+    <div id='map' style='width: 100%; height: 100%;'></div>
+    <img id="logo" src="Faimes.png" alt="Logo">
+
+    <script>
+      mapboxgl.accessToken = 'pk.eyJ1IjoidHRvb2ZmIiwiYSI6ImNscXd4bmppMDA4bnAya3B6enB5MDNhaGsifQ.5MU53sF5b8x2yVpTmBoNyw';
+      const map = new mapboxgl.Map({
+	      container: 'map', // container ID
+        style: 'mapbox://styles/ttooff/clrqwd2df00a801pg9fpn0772', // style URL
+        center: [5.27039, 50.63578], // starting position [lng, lat]50.63578/5.27039
+        zoom: 13, // starting zoom
+      });
+
+      // Function to load and parse the OSM file
+      function loadOSMFile(filePath) {
+          fetch(filePath)
+              .then(response => {
+                  if (!response.ok) {
+                      throw new Error('Network response was not ok');
+                  }
+                  return response.text();
+              })
+              .then(data => {
+                  parseOSMData(data);
+              })
+              .catch(error => {
+                  console.error('Error loading OSM file:', error);
+              });
+      }
+
+
+      
+      // Function to parse OSM data
+      function parseOSMData(data) {
+          const parser = new DOMParser();
+          const xmlData = parser.parseFromString(data, 'text/xml');
+          const nodes = xmlData.querySelectorAll('node');
+          const ways = xmlData.querySelectorAll('way');
+
+          // Process each node
+          nodes.forEach(node => {
+              // Access node attributes
+              const id = node.getAttribute('id');
+              const lat = node.getAttribute('lat');
+              const lon = node.getAttribute('lon');
+              
+              // Do further processing as needed
+              console.log(`Node ID: ${id}, Latitude: ${lat}, Longitude: ${lon}`);
+          });
+      }
+
+      // Example usage: replace 'your_osm_file.osm' with the path to your OSM file
+      const osmFilePath = 'Faimes_Promenades.osm';
+      loadOSMFile(osmFilePath);
+
+
+
+
+
+
+
+
+
+
+
+      // Initialize a navigation control with the compass
+      const nav = new mapboxgl.NavigationControl();
+      map.addControl(nav, 'top-right');
+
+      // Load GeoJSON data after the map is fully loaded
+      map.on('load', () => {
+          fetch('Faimes_Promenades.geojson') // Replace with the correct path to your GeoJSON file
+            .then(response => response.json())
+            .then(data => {
+              // Add a GeoJSON source to the map
+              map.addSource('custom-source', {
+                type: 'geojson',
+                data: data
+              });
+
+              // Iterate through each feature
+              data.features.forEach(feature => {
+                const faimesAttributes = Object.keys(feature.properties).filter(prop => prop.startsWith('Faimes'));
+                
+                // If only one Faimes attribute is defined, draw the line with the corresponding color and add to single layer
+                if (faimesAttributes.length === 1) {
+                  const color = getColorByAttribute(faimesAttributes[0]);
+                  drawLine(feature, color, 0, faimesAttributes[0]);
+                }
+                // If two Faimes attributes are defined, draw two independent parallel lines with an offset and corresponding colors and add to double layer
+                else if (faimesAttributes.length === 2) {
+                  const color1 = getColorByAttribute(faimesAttributes[0]);
+                  const color2 = getColorByAttribute(faimesAttributes[1]);
+                  drawLine(feature, color1, -3.5, faimesAttributes[0]);
+                  drawLine(feature, color2, +3.5, faimesAttributes[1]);
+                }
+                // If three Faimes attributes are defined, draw three independent parallel lines with an offset and corresponding colors and add to triple layer
+                else if (faimesAttributes.length === 3) {
+                  const color1 = getColorByAttribute(faimesAttributes[0]);
+                  const color2 = getColorByAttribute(faimesAttributes[1]);
+                  const color3 = getColorByAttribute(faimesAttributes[2]);
+                  drawLine(feature, color1, -7, faimesAttributes[0]);
+                  drawLine(feature, color2,  7, faimesAttributes[1]);
+                  drawLine(feature, color3,  0, faimesAttributes[2]);
+                }
+                // Add more conditions for handling other cases if needed
+              });
+
+            // Move all layers containing "label" to the front
+            const layers = map.getStyle().layers;
+              layers.forEach(layer => {
+                if (layer.id.includes('label')) {
+                  map.moveLayer(layer.id);
+                }
+              });
+
+          })
+          .catch(error => console.error('Error loading GeoJSON:', error));
+      });
+
+      // Function to draw a single line with a specified color and add it to the specified layer
+      function drawLine(feature, color, offset, faimesId) {
+        map.addLayer({
+          'id': faimesId+feature.properties['@id']+'-'+offset,
+          'type': 'line',
+          'source': 'custom-source',
+          'paint': {
+              'line-color': color,
+              'line-width': 5, // Default line width
+              'line-offset': offset // Apply the offset
+          },
+          'layout': {
+            'line-cap': 'round',
+            'line-join': 'round'
+          },
+          'filter': ['==', '@id', feature.properties['@id']]
+        });
+      }
+
+      // Function to get color based on Faimes attribute
+      function getColorByAttribute(attribute) {
+        // You can modify this function to return different colors based on the Faimes attribute
+        // For simplicity, I'll use a switch statement here
+        switch (attribute) {
+          case 'Faimes1': return 'rgb(224, 7, 3)';    // Rouge
+          case 'Faimes2': return 'rgb(58, 165, 252)'; // Bleu clair
+          case 'Faimes3': return 'rgb(140, 25, 169)'; // Mauve
+          case 'Faimes5': return 'rgb(102, 202, 88)'; // Vert
+          case 'Faimes11': return 'rgb(253, 186, 2)'; // Orange
+          // Add more cases as needed
+          default: return 'yellow'; // Default color if none of the cases are met
+        }
+      }
+    </script>
+  </body>
+
+</html>

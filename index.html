@@ -33,101 +33,108 @@
       const map = new mapboxgl.Map({
 	      container: 'map', // container ID
         style: 'mapbox://styles/ttooff/clrqwd2df00a801pg9fpn0772', // style URL
-        center: [5.27039, 50.63578], // starting position [lng, lat]50.63578/5.27039
-        zoom: 13, // starting zoom
+        center: [5.269345925758392, 50.64679314962734], // starting position [lng, lat]50.63578/5.27039
+        zoom: 12.3, // starting zoom
       });
 
-// Initialize a pop-up instance
-const popup = new mapboxgl.Popup({ closeButton: false });
+      // Initialize a navigation control with the compass
+      const nav = new mapboxgl.NavigationControl();
+      map.addControl(nav, 'top-right');
 
-// Initialize a navigation control with the compass
-const nav = new mapboxgl.NavigationControl();
-map.addControl(nav, 'top-right');
+      // Load GeoJSON data after the map is fully loaded
+      map.on('load', () => {
+          fetch('Faimes_Promenades.geojson') // Replace with the correct path to your GeoJSON file
+            .then(response => response.json())
+            .then(data => {
+              // Add a GeoJSON source to the map
+              map.addSource('custom-source', {
+                type: 'geojson',
+                data: data
+              });
 
- // Load GeoJSON data after the map is fully loaded
- map.on('load', () => {
-    fetch('Faimes_Promenades.geojson') // Replace with the correct path to your GeoJSON file
-      .then(response => response.json())
-      .then(data => {
-        // Add a GeoJSON source to the map
-        map.addSource('custom-source', {
-          type: 'geojson',
-          data: data
-        });
+              // Iterate through each feature
+              data.features.forEach(feature => {
+                let faimesAttributes = Object.keys(feature.properties).filter(prop => prop.startsWith('Faimes'));
+                // Sort the faimesAttributes array alphabetically
+                faimesAttributes.sort();
 
-        // Iterate through each feature
-        data.features.forEach(feature => {
-          const faimesAttributes = Object.keys(feature.properties).filter(prop => prop.startsWith('Faimes'));
+                  // Switch statement to handle different cases based on the number of Faimes attributes
+                  switch (faimesAttributes.length) {
+                      case 1:
+                          const color1 = getColorByAttribute(faimesAttributes[0]);
+                          drawLine(feature, color1, 0, faimesAttributes[0]);
+                          break;
+                      case 2:
+                          const color2_1 = getColorByAttribute(faimesAttributes[0]);
+                          const color2_2 = getColorByAttribute(faimesAttributes[1]);
+                          drawLine(feature, color2_1, -3.5, faimesAttributes[0]);
+                          drawLine(feature, color2_2, +3.5, faimesAttributes[1]);
+                          break;
+                      case 3:
+                          const color3_1 = getColorByAttribute(faimesAttributes[0]);
+                          const color3_2 = getColorByAttribute(faimesAttributes[1]);
+                          const color3_3 = getColorByAttribute(faimesAttributes[2]);
+                          drawLine(feature, color3_1, 0, faimesAttributes[0]);
+                          drawLine(feature, color3_2, -7, faimesAttributes[1]);
+                          drawLine(feature, color3_3, 7, faimesAttributes[2]);
+                          break;
+                      // Add more cases for handling additional numbers of Faimes attributes if needed
+                      default:
+                          // Handle the default case if necessary
+                          break;
+                  }
+              });
+
+            // Move all layers containing "label" to the front
+            const layers = map.getStyle().layers;
+              layers.forEach(layer => {
+                if (layer.id.includes('label')) {
+                  map.moveLayer(layer.id);
+                }
+              });
+
+          })
+          .catch(error => console.error('Error loading GeoJSON:', error));
+      });
+
+      // Function to draw a single line with a specified color and add it to the specified layer
+      function drawLine(feature, color, offset, faimesId) {
+        map.addLayer({
+          'id': faimesId+feature.properties['@id']+'-'+offset,
+          'type': 'line',
+          'source': 'custom-source',
+          'paint': {
+              'line-color': color,
+              'line-width': 5, // Default line width should be 5
+              'line-offset': offset // Apply the offset
+          },
+          'layout': {
+            'line-cap': 'round',
+            'line-join': 'round'
+          },
+          'filter': ['all', ['==', '@id', feature.properties['@id']], ['==', faimesId, 'yes']]
           
-          // If only one Faimes attribute is defined, draw the line with the corresponding color and add to single layer
-          if (faimesAttributes.length === 1) {
-            const color = getColorByAttribute(faimesAttributes[0]);
-            drawLine(feature, color, 0, faimesAttributes[0]);
-          }
-          // If two Faimes attributes are defined, draw two independent parallel lines with an offset and corresponding colors and add to double layer
-          else if (faimesAttributes.length === 2) {
-            const color1 = getColorByAttribute(faimesAttributes[0]);
-            const color2 = getColorByAttribute(faimesAttributes[1]);
-            drawLine(feature, color1, -3.5, faimesAttributes[0]);
-            drawLine(feature, color2, +3.5, faimesAttributes[1]);
-          }
-          // If three Faimes attributes are defined, draw three independent parallel lines with an offset and corresponding colors and add to triple layer
-          else if (faimesAttributes.length === 3) {
-            const color1 = getColorByAttribute(faimesAttributes[0]);
-            const color2 = getColorByAttribute(faimesAttributes[1]);
-            const color3 = getColorByAttribute(faimesAttributes[2]);
-            drawLine(feature, color1, -7, faimesAttributes[0]);
-            drawLine(feature, color2,  7, faimesAttributes[1]);
-            drawLine(feature, color3,  0, faimesAttributes[2]);
-          }
-          // Add more conditions for handling other cases if needed
         });
+        console.log(faimesId);
+      }
 
-       // Move all layers containing "label" to the front
-       const layers = map.getStyle().layers;
-        layers.forEach(layer => {
-          if (layer.id.includes('label')) {
-            map.moveLayer(layer.id);
-          }
-        });
-
-    })
-    .catch(error => console.error('Error loading GeoJSON:', error));
-});
-
-// Function to draw a single line with a specified color and add it to the specified layer
-function drawLine(feature, color, offset, faimesId) {
-  map.addLayer({
-    'id': faimesId+feature.properties['@id']+'-'+offset,
-    'type': 'line',
-    'source': 'custom-source',
-    'paint': {
-        'line-color': color,
-        'line-width': 5, // Default line width
-        'line-offset': offset // Apply the offset
-    },
-    'layout': {
-      'line-cap': 'round',
-      'line-join': 'round'
-    },
-    'filter': ['==', '@id', feature.properties['@id']]
-  });
-}
-
-// Function to get color based on Faimes attribute
-function getColorByAttribute(attribute) {
-  // You can modify this function to return different colors based on the Faimes attribute
-  // For simplicity, I'll use a switch statement here
-  switch (attribute) {
-    case 'Faimes1': return 'rgb(224, 7, 3)';    // Rouge
-    case 'Faimes2': return 'rgb(58, 165, 252)'; // Bleu clair
-    case 'Faimes3': return 'rgb(140, 25, 169)'; // Mauve
-    case 'Faimes5': return 'rgb(102, 202, 88)'; // Vert
-    case 'Faimes11': return 'rgb(253, 186, 2)'; // Orange
-    // Add more cases as needed
-    default: return 'yellow'; // Default color if none of the cases are met
-  }
-}
+      // Function to get color based on Faimes attribute
+      function getColorByAttribute(attribute) {
+        // You can modify this function to return different colors based on the Faimes attribute
+        // For simplicity, I'll use a switch statement here
+        switch (attribute) {
+          case 'Faimes1': return 'rgb(224, 7, 3)';    // Rouge
+          case 'Faimes2': return 'rgb(58, 165, 252)'; // Bleu clair
+          case 'Faimes3': return 'rgb(140, 25, 169)'; // Mauve
+          case 'Faimes5': return 'rgb(102, 202, 88)'; // Vert
+          case 'Faimes7': return 'rgb(180, 180, 80)'; // Brun
+          case 'Faimes8': return 'rgb(224, 127, 130)'; // Rose
+          case 'Faimes9': return 'rgb(61, 89, 177)'; // Bleu foncé
+          case 'Faimes11': return 'rgb(253, 186, 2)'; // Orange
+          // Add more cases as needed
+          default: return 'yellow'; // Default color if none of the cases are met
+        }
+      }
     </script>
   </body>
 
